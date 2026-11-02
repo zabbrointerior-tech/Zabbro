@@ -83,7 +83,7 @@ function satuanInfo(s){s=(s||'/ m2').trim();let m={'/ m2':{qtyNama:'m2',icon:'ðŸ
 function getKalk(){if(!data.settings.kalk)data.settings.kalk=JSON.parse(JSON.stringify(DEFAULT_DATA.settings.kalk));return data.settings.kalk}
 function normalizeWA(w){w=(w||'').replace(/\D/g,'');if(w.startsWith('0'))w='62'+w.substring(1);return w}
 function isValidEmail(e){return !e||/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)}
-function getUsers(){try{return JSON.parse(localStorage.getItem('zabbro_users')||'[]')}catch(e){return[]}}
+function getUsers(){try{if(data.users&&data.users.length)return data.users}catch(e){}return JSON.parse(localStorage.getItem('zabbro_users')||'[]')}
 function saveUsers(u){localStorage.setItem('zabbro_users',JSON.stringify(u));try{data.users=u;fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).catch(()=>{})}catch(e){}}
 function getCurrentUser(){try{return JSON.parse(localStorage.getItem('zabbro_current')||'null')}catch(e){return null}}
 function setCurrentUser(u){if(u)localStorage.setItem('zabbro_current',JSON.stringify(u));else localStorage.removeItem('zabbro_current');updateAkunUI()}
