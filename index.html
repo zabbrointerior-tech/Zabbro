@@ -130,10 +130,12 @@ let p=data.produk[i]; if(!p)return;
 document.getElementById('detailFotoUtama').innerHTML='<img src="'+(p.foto||'')+'" style="width:100%;height:280px;object-fit:cover" onerror="this.src=\'https://images.unsplash.com/photo-1522708323259-d24dbb6b0267?w=600&q=80\'">';
 document.getElementById('detailNama').innerText=p.nama||'Produk';
 document.getElementById('detailHarga').innerText='Rp '+(p.harga||0).toLocaleString('id-ID')+' / '+(p.satuan||'');
-document.getElementById('detailDeskripsi').innerText=(p.desk||'Belum ada deskripsi')+(p.kode?'\n\nKode: '+p.kode:'')+(p.kat?'\nKategori: '+p.kat:'');
+document.getElementById('detailDeskripsi').innerHTML=(p.desk? p.desk : '<i style="color:#999">Belum ada deskripsi</i>')+'<br><br><b>📐 Ukuran:</b> '+(typeof formatUkuran==='function'?formatUkuran(p):'-')+'<br><b>📦 Isi:</b> '+(p.isi||p.isiBox||'-')+'<br><b>📋 Kode:</b> '+(p.kode||'-')+'<br><b>🏷️ Kategori:</b> '+(p.kat||'-');
 document.getElementById('detailStok').innerText='Stok: '+(p.stok!=null?p.stok:'-')+' • '+(p.statusStok||'');
 let wa=(data.settings&&data.settings.wa)||'6285283201808';
 document.getElementById('detailWA').href='https://wa.me/'+wa+'?text='+encodeURIComponent('Halo ZABBRO, saya mau pesan: '+(p.nama||'')+' - Rp '+(p.harga||0));
+document.getElementById('detailCart').onclick=function(){addToCart(i,1);tutupDetail()};
+document.getElementById('detailKalk').onclick=function(){tutupDetail();openKalk(i)};
 document.getElementById('modalProduk').style.display='block';
 }
 function tutupDetail(){document.getElementById('modalProduk').style.display='none'}
@@ -317,6 +319,8 @@ tampilHero();
 <div id="detailHarga" style="color:#2563eb;font-weight:800;font-size:20px"></div>
 <div id="detailDeskripsi" style="margin:12px 0;white-space:pre-line;line-height:1.6"></div>
 <div id="detailStok" style="color:#666;font-size:13px"></div>
+  <button id="detailCart" style="width:100%;padding:12px;border-radius:10px;border:0;background:#2563eb;color:#fff;font-weight:700;margin-top:14px">🛒 + Keranjang</button>
+<button id="detailKalk" style="width:100%;padding:12px;border-radius:10px;border:1px solid #2563eb;background:#fff;color:#2563eb;font-weight:700;margin-top:8px">🧮 Hitung Kebutuhan + Biaya</button>
 <a id="detailWA" target="_blank" style="display:block;text-align:center;background:#22c55e;color:#fff;padding:12px;border-radius:10px;text-decoration:none;font-weight:700;margin-top:14px">💬 Pesan via WA</a>
 <button onclick="tutupDetail()" style="width:100%;margin-top:8px;padding:12px;border-radius:10px;border:0;background:#eee;font-weight:700">Tutup</button>
 </div>
