@@ -368,6 +368,8 @@ tampilHero();
 }
 };
 </script>
+  
+  <script>
   <div id="modalProduk" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;overflow-y:auto;padding:16px" onclick="if(event.target==this)tutupDetail()">
 <div style="background:#fff;max-width:480px;margin:20px auto;border-radius:16px;overflow:hidden">
 <div id="detailFotoUtama"></div>
@@ -382,7 +384,10 @@ tampilHero();
 <button onclick="tutupDetail()" style="width:100%;margin-top:8px;padding:12px;border-radius:10px;border:0;background:#eee;font-weight:700">Tutup</button>
 </div>
 </div>
-</div><script>
+</div>
+    </script>
+  
+  <script>
 if(location.search.includes('export')){
   setTimeout(async()=>{
     let all = '';
@@ -398,7 +403,8 @@ if(location.search.includes('export')){
     document.body.innerHTML='<h3 style=padding:12px>Copy semua ini kirim ke saya</h3><h4>LOCAL:</h4><textarea style=width:100%;height:40vh>'+all+'</textarea><h4>SERVER NPOINT:</h4><textarea style=width:100%;height:40vh>'+server+'</textarea>';
   },500);
 }
-</script><script>
+</script>
+  <script>
 // PATCH FINAL V2 - anti 0 + auto pull
 (function(){
   const NPOINT='https://api.npoint.io/4de503fd38d36ee7d2c1';
