@@ -369,8 +369,8 @@ tampilHero();
 };
 </script>
   
-  <script>
-  <div id="modalProduk" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;overflow-y:auto;padding:16px" onclick="if(event.target==this)tutupDetail()">
+<!-- MODAL PRODUK - FIX: di luar <script> -->
+<div id="modalProduk" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;overflow-y:auto;padding:16px" onclick="if(event.target==this)tutupDetail()">
 <div style="background:#fff;max-width:480px;margin:20px auto;border-radius:16px;overflow:hidden">
 <div id="detailFotoUtama"></div>
 <div style="padding:0 16px 16px">
@@ -378,114 +378,76 @@ tampilHero();
 <div id="detailHarga" style="color:#2563eb;font-weight:800;font-size:20px"></div>
 <div id="detailDeskripsi" style="margin:12px 0;white-space:pre-line;line-height:1.6"></div>
 <div id="detailStok" style="color:#666;font-size:13px"></div>
-  <button id="detailCart" style="width:100%;padding:12px;border-radius:10px;border:0;background:#2563eb;color:#fff;font-weight:700;margin-top:14px">🛒 + Keranjang</button>
+<button id="detailCart" style="width:100%;padding:12px;border-radius:10px;border:0;background:#2563eb;color:#fff;font-weight:700;margin-top:14px">🛒 + Keranjang</button>
 <button id="detailKalk" style="width:100%;padding:12px;border-radius:10px;border:1px solid #2563eb;background:#fff;color:#2563eb;font-weight:700;margin-top:8px">🧮 Hitung Kebutuhan + Biaya</button>
 <a id="detailWA" target="_blank" style="display:block;text-align:center;background:#22c55e;color:#fff;padding:12px;border-radius:10px;text-decoration:none;font-weight:700;margin-top:14px">💬 Pesan via WA</a>
 <button onclick="tutupDetail()" style="width:100%;margin-top:8px;padding:12px;border-radius:10px;border:0;background:#eee;font-weight:700">Tutup</button>
-</div>
-</div>
-</div>
-    </script>
-  
-  <script>
+</div></div></div>
+
+<script>
+// EXPORT MODE ?export
 if(location.search.includes('export')){
   setTimeout(async()=>{
-    let all = '';
-    for(let i=0;i<localStorage.length;i++){
-      let k=localStorage.key(i);
-      all+=k+':\n'+localStorage.getItem(k)+'\n\n---\n\n';
-    }
-    let server='(gagal ambil server)';
-    try{
-      let r=await fetch('https://api.npoint.io/4de503fd38d36ee7d2c1');
-      server=await r.text();
-    }catch(e){}
+    let all='';for(let i=0;i<localStorage.length;i++){let k=localStorage.key(i);all+=k+':\n'+localStorage.getItem(k)+'\n\n---\n\n';}
+    let server='(gagal ambil server)';try{let r=await fetch('https://api.npoint.io/4de503fd38d36ee7d2c1');server=await r.text();}catch(e){}
     document.body.innerHTML='<h3 style=padding:12px>Copy semua ini kirim ke saya</h3><h4>LOCAL:</h4><textarea style=width:100%;height:40vh>'+all+'</textarea><h4>SERVER NPOINT:</h4><textarea style=width:100%;height:40vh>'+server+'</textarea>';
   },500);
 }
 </script>
-  <script>
-// PATCH FINAL V2 - anti 0 + auto pull
+
+<script>
+// PATCH FINAL V3 - FIX total bug
 (function(){
   const NPOINT='https://api.npoint.io/4de503fd38d36ee7d2c1';
-  
   async function pushOrder(newOrder){
     try{
-      if(!newOrder || !newOrder.id) return;
-      let cur={}; try{cur=await (await fetch(NPOINT+'?t='+Date.now())).json()}catch(e){cur={};}
-      let srv = cur.orders || cur.zabbro_orders || [];
-      if(!srv.find(x=>x.id==newOrder.id)) srv.push(newOrder);
-      if(srv.length===0) return;
-      cur.orders=srv; cur.zabbro_orders=srv;
-      await fetch(NPOINT, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(cur)});
-      localStorage.setItem('orders', JSON.stringify(srv));
-      localStorage.setItem('zabbro_orders', JSON.stringify(srv));
-      localStorage.setItem('pesanan', JSON.stringify(srv));
-      console.log('PUSH OK',srv.length);
+      if(!newOrder||!newOrder.id) return;
+      let cur={};try{cur=await (await fetch(NPOINT+'?t='+Date.now())).json()}catch(e){cur={};}
+      let srv=cur.orders||cur.zabbro_orders||[];if(!srv.find(x=>x.id==newOrder.id))srv.push(newOrder);
+      cur.orders=srv;cur.zabbro_orders=srv;
+      await fetch(NPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cur)});
+      localStorage.setItem('orders',JSON.stringify(srv));localStorage.setItem('zabbro_orders',JSON.stringify(srv));localStorage.setItem('pesanan',JSON.stringify(srv));
       return srv;
-    }catch(e){console.error(e);}
-  }
-
-  async function pullOrder(){
-    try{
-      let r=await fetch(NPOINT+'?t='+Date.now());
-      let cur=await r.json();
-      let srv=cur.orders||cur.zabbro_orders||[];
-      if(srv.length===0) return;
-      let local=[]; try{local=JSON.parse(localStorage.getItem('zabbro_orders')||'[]')}catch(e){}
-      if(srv.length>local.length || srv.length!==local.length){
-        localStorage.setItem('orders', JSON.stringify(srv));
-        localStorage.setItem('zabbro_orders', JSON.stringify(srv));
-        localStorage.setItem('pesanan', JSON.stringify(srv));
-        if(window.data) data.orders=srv;
-        window.orders=srv;
-        if(typeof renderAll==='function') renderAll();
-        console.log('PULL OK',srv.length);
-      }
     }catch(e){}
   }
-
-  // bungkus fungsi checkout lama
-  if(window.buatPesanan){ const _o=window.buatPesanan; window.buatPesanan=async function(o){ let r=await _o(o); await pushOrder(o||r); return r; } }
-  if(window.checkout){ const _o=window.checkout; window.checkout=async function(o){ let r=await _o(o); await pushOrder(o||r); return r; } }
-  if(window.kirimPesanan){ const _o=window.kirimPesanan; window.kirimPesanan=async function(o){ let r=await _o(o); await pushOrder(o||r); return r; } }
-  if(window.buatPesananWA){ const _o=window.buatPesananWA; window.buatPesananWA=async function(o){ let r=await _o(o); await pushOrder(o||r); return r; } }
-
-  window.pushOrder=pushOrder;
-  pullOrder();
-  setInterval(pullOrder, 8000);
-  window.addEventListener('focus', pullOrder);
-  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) pullOrder(); });
+  async function pullOrder(){
+    try{let r=await fetch(NPOINT+'?t='+Date.now());let cur=await r.json();let srv=cur.orders||cur.zabbro_orders||[];if(srv.length===0)return;
+      let local=[];try{local=JSON.parse(localStorage.getItem('zabbro_orders')||'[]')}catch(e){}
+      if(srv.length>=local.length){localStorage.setItem('orders',JSON.stringify(srv));localStorage.setItem('zabbro_orders',JSON.stringify(srv));localStorage.setItem('pesanan',JSON.stringify(srv));window.orders=srv;if(window.data)data.orders=srv;if(typeof renderAll==='function')renderAll();}
+    }catch(e){}
+  }
+  window.pushOrder=pushOrder;pullOrder();setInterval(pullOrder,8000);
 })();
 </script>
-  
-  <script>
-      
-function kirimBukti(id){
-  let inp=document.createElement('input'); inp.type='file'; inp.accept='image/*';
-  inp.onchange=async(e)=>{
-    let file=e.target.files[0]; if(!file) return;
-    let base64=await new Promise((res,rej)=>{
-      let img=new Image();
-      img.onload=()=>{
-        let c=document.createElement('canvas'), maxW=800, s=Math.min(1,maxW/img.width);
-        c.width=img.width*s; c.height=img.height*s;
-        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
-        res(c.toDataURL('image/jpeg',0.6));
-      }; img.onerror=rej;
-      let r=new FileReader(); r.onload=()=>img.src=r.result; r.readAsDataURL(file);
-    });
-    let o=orders.find(x=>x.id==id)||data.orders.find(x=>x.id==id);
-    if(o){ o.bukti=base64; o.tglBukti=new Date().toISOString(); o.status='bukti_terkirim'; if(!o.riwayat)o.riwayat=[]; o.riwayat.push({tgl:new Date().toLocaleString('id-ID'),aksi:'Bukti dikirim'}); localStorage.setItem('zabbro_orders',JSON.stringify(orders)); saveOrders(orders); alert('✅ Bukti berhasil terkirim!'); renderAll(); }
-  }; inp.click();
-}
-function batalkanPesanan(id){ if(!confirm('Batalkan?'))return; let o=orders.find(x=>x.id==id); if(o){ o.status='dibatalkan'; saveOrders(orders); renderAll(); } }
-function hapusPesanan(id){ if(!confirm('Hapus?'))return; orders=orders.filter(x=>x.id!=id); data.orders=orders; localStorage.setItem('zabbro_orders',JSON.stringify(orders)); saveOrders(orders); renderAll(); }
 
+<script>
+// FIX UTAMA: bukti kompres + saveOrders tidak boleh return kalau 0
 function saveOrders(o){
-  if(!o||o.length===0) return;
-  localStorage.setItem('zabbro_orders',JSON.stringify(o));
-  (async()=>{ try{ await fetch('https://api.npoint.io/4de503fd38d36ee7d2c1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orders:o,zabbro_orders:o})}); }catch(e){} })();
+  localStorage.setItem('zabbro_orders',JSON.stringify(o||[]));
+  localStorage.setItem('orders',JSON.stringify(o||[]));
+  localStorage.setItem('pesanan',JSON.stringify(o||[]));
+  (async()=>{try{
+    let cur={};try{cur=await (await fetch('https://api.npoint.io/4de503fd38d36ee7d2c1')).json()}catch(e){cur={};}
+    cur.orders=o||[];cur.zabbro_orders=o||[];
+    await fetch('https://api.npoint.io/4de503fd38d36ee7d2c1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cur)});
+  }catch(e){}})();
 }
-      </script>
+function kirimBukti(id){
+  let inp=document.createElement('input');inp.type='file';inp.accept='image/*';
+  inp.onchange=async(e)=>{
+    let file=e.target.files[0];if(!file)return;
+    let base64=await new Promise((res,rej)=>{
+      let img=new Image();img.onload=()=>{
+        let c=document.createElement('canvas'),maxW=800,s=Math.min(1,maxW/img.width);
+        c.width=img.width*s;c.height=img.height*s;c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        res(c.toDataURL('image/jpeg',0.6));
+      };img.onerror=rej;let r=new FileReader();r.onload=()=>img.src=r.result;r.readAsDataURL(file);
+    });
+    let list=window.orders||[];let o=list.find(x=>x.id==id)||(window.data&&data.orders?data.orders.find(x=>x.id==id):null);
+    if(o){o.bukti=base64;o.tglBukti=new Date().toISOString();o.status='bukti_terkirim';if(!o.riwayat)o.riwayat=[];o.riwayat.push({tgl:new Date().toLocaleString('id-ID'),aksi:'Bukti dikirim'});saveOrders(list);alert('✅ Bukti berhasil terkirim!');if(typeof renderAll==='function')renderAll();else location.reload();}
+  };inp.click();
+}
+function batalkanPesanan(id){if(!confirm('Batalkan?'))return;let o=(window.orders||[]).find(x=>x.id==id);if(o){o.status='dibatalkan';saveOrders(window.orders);if(typeof renderAll==='function')renderAll();else location.reload();}}
+function hapusPesanan(id){if(!confirm('Hapus permanen?'))return;window.orders=(window.orders||[]).filter(x=>x.id!=id);if(window.data)data.orders=window.orders;saveOrders(window.orders);if(typeof renderAll==='function')renderAll();else location.reload();}
+</script>
 </body></html>
