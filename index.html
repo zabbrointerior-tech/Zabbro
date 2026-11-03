@@ -368,4 +368,32 @@ if(location.search.includes('export')){
     document.body.innerHTML='<h3 style=padding:12px>Copy semua ini kirim ke saya</h3><h4>LOCAL:</h4><textarea style=width:100%;height:40vh>'+all+'</textarea><h4>SERVER NPOINT:</h4><textarea style=width:100%;height:40vh>'+server+'</textarea>';
   },500);
 }
+</script><script>
+// PATCH FINAL - pastikan checkout selalu masuk server
+(function(){
+  const NPOINT='https://api.npoint.io/4de503fd38d36ee7d2c1';
+  async function pushOrder(newOrder){
+    try{
+      let cur={}; try{cur=await (await fetch(NPOINT)).json()}catch(e){cur={};}
+      let srv = cur.orders || cur.zabbro_orders || [];
+      if(newOrder && newOrder.id){
+        if(!srv.find(x=>x.id===newOrder.id)) srv.push(newOrder);
+      }
+      cur.orders=srv; cur.zabbro_orders=srv;
+      await fetch(NPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cur)});
+      localStorage.setItem('orders', JSON.stringify(srv));
+      localStorage.setItem('zabbro_orders', JSON.stringify(srv));
+      localStorage.setItem('pesanan', JSON.stringify(srv));
+      if(typeof orders!=='undefined') window.orders=srv;
+      console.log('PUSH OK total',srv.length);
+      return srv;
+    }catch(e){ console.error(e); }
+  }
+  // kalau ada fungsi checkout lama, kita bungkus
+  if(window.buatPesanan){ const _old=window.buatPesanan; window.buatPesanan=async function(o){ let r=await _old(o); await pushOrder(o||r); return r; } }
+  if(window.checkout){ const _old=window.checkout; window.checkout=async function(o){ let r=await _old(o); await pushOrder(o||r); return r; } }
+  if(window.kirimPesanan){ const _old=window.kirimPesanan; window.kirimPesanan=async function(o){ let r=await _old(o); await pushOrder(o||r); return r; } }
+  // expose global
+  window.pushOrder = pushOrder;
+})();
 </script></body></html>
