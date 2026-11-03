@@ -108,41 +108,55 @@ function tampilMember(){let us=getUsers();document.getElementById('listMember').
 function chatMember(wa,n){window.open('https://wa.me/'+wa+'?text=Halo '+encodeURIComponent(n)+', ini dari ZABBRO 🙏','_blank')}
 function hapusMember(i){if(!confirm('Hapus member ini?'))return;let u=getUsers();u.splice(i,1);saveUsers(u);tampilMember();updateStats()}
 function hapusSemuaMember(){if(!confirm('Hapus semua member?'))return;localStorage.removeItem('zabbro_users');tampilMember();updateStats()}
-async function saveAll() {
-  try {
+async function saveAll(){
+  try{
     // 1. Ambil yang ada di server dulu
-    let serverData = { orders: [] };
-    try {
-      const res = await fetch('https://api.npoint.io/4de503fd38d36ee7d2c1');
-      serverData = await res.json();
-    } catch(e) {}
+    let serverOrders = [];
+    let serverRaw = {};
+    try{
+      let r = await fetch('https://api.npoint.io/4de503fd38d36ee7d2c1');
+      serverRaw = await r.json();
+      serverOrders = serverRaw.orders || serverRaw.pesanan || [];
+    }catch(e){}
 
-    // 2. Ambil yang ada di HP ini
-    const localData = JSON.parse(localStorage.getItem('zabbro_data') || '{}');
-    const localOrders = localData.orders || JSON.parse(localStorage.getItem('zabbro_orders') || '[]') || [];
+    // 2. Ambil yang ada di HP ini (cek semua key)
+    let localOrders = [];
+    try{ localOrders = JSON.parse(localStorage.getItem('zabbro_data')||'{}').orders || [] }catch(e){}
+    if(localOrders.length===0){
+      try{ localOrders = JSON.parse(localStorage.getItem('zabbro_orders')||'[]') }catch(e){}
+    }
+    if(localOrders.length===0){
+      try{ localOrders = JSON.parse(localStorage.getItem('orders')||'[]') }catch(e){}
+    }
+    if(localOrders.length===0){
+      try{ localOrders = JSON.parse(localStorage.getItem('pesanan')||'[]') }catch(e){}
+    }
 
-    // 3. Gabung, jangan timpa — hindari duplikat ID
-    const merged = [...(serverData.orders || [])];
-    localOrders.forEach(o => {
-      if (!merged.find(x => x.id === o.id)) merged.push(o);
-    });
-    
-    // Kalau ada order baru dari HP ini yang belum ada di merged, tambahin juga
-    if (localData.orders) localData.orders = merged;
-    
-    serverData.orders = merged;
-    serverData.zabbro_data = localData; // simpan full
-
-    // 4. Baru upload
-    await fetch('https://api.npoint.io/4de503fd38d36ee7d2c1', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(serverData)
+    // 3. Gabung, jangan timpa
+    let merged = [...serverOrders];
+    localOrders.forEach(o=>{
+      if(!merged.find(x=>x.id===o.id)) merged.push(o);
     });
 
-    localStorage.setItem('zabbro_data', JSON.stringify(localData));
-    console.log('SYNC OK, total:', merged.length);
-  } catch(e) { console.error(e); }
+    // 4. Simpan balik
+    serverRaw.orders = merged;
+    serverRaw.pesanan = merged; // jaga-jaga kamu pakai key pesanan
+
+    await fetch('https://api.npoint.io/4de503fd38d36ee7d2c1',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(serverRaw)
+    });
+
+    // Update lokal juga
+    localStorage.setItem('orders', JSON.stringify(merged));
+    localStorage.setItem('zabbro_orders', JSON.stringify(merged));
+    let d = JSON.parse(localStorage.getItem('zabbro_data')||'{}');
+    d.orders = merged;
+    localStorage.setItem('zabbro_data', JSON.stringify(d));
+    
+    console.log('SYNC OK total:', merged.length);
+  }catch(e){ console.error('saveAll error', e) }
 }
 async function loadData(){try{let r=await fetch(API_URL),j=await r.json();if(j&&j.settings){if(!j.settings.kalk)j.settings.kalk=DEFAULT_DATA.settings.kalk;if(!j.settings.footer)j.settings.footer=DEFAULT_DATA.settings.footer;if(!j.settings.ongkir)j.settings.ongkir=DEFAULT_DATA.settings.ongkir;if(!j.hero)j.hero=DEFAULT_DATA.hero;if(!j.kelebihan)j.kelebihan=DEFAULT_DATA.kelebihan;if(!j.ba)j.ba=[];if(!j.testi)j.testi=[];if(!j.kategori)j.kategori=DEFAULT_DATA.kategori;if(!j.produk||!j.produk.length)j.produk=DEFAULT_DATA.produk;data=j;document.getElementById('statusAdmin').innerText="✅ Terhubung • "+data.produk.length+" produk";document.getElementById('status').innerText="✅ Data terbaru • "+data.produk.length+" produk"}}catch(e){document.getElementById('status').innerText="✅ Pakai data default (offline) • "+data.produk.length+" produk";document.getElementById('statusAdmin').innerText="⚠️ Offline - pakai data default"}cart=getCart();orders=getOrders();renderAll();updateAkunUI();updateCartUI()}
 function renderAll(){try{renderKatalog();if(data.users)saveUsers(data.users);renderAdminLists();isiDropdown();updateStats();renderFooter()}catch(e){document.getElementById('status').innerText='⚠️ Error render: '+e.message}}
