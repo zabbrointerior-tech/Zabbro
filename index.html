@@ -146,39 +146,43 @@ function chatMember(wa,n){window.open('https://wa.me/'+wa+'?text=Halo '+encodeUR
 function hapusMember(i){if(!confirm('Hapus member ini?'))return;let u=getUsers();u.splice(i,1);saveUsers(u);tampilMember();updateStats()}
 function hapusSemuaMember(){if(!confirm('Hapus semua member?'))return;localStorage.removeItem('zabbro_users');tampilMember();updateStats()}
 
-async function loadData(){try{
-  let r=await fetch(API_URL), j=await r.json();
-  if(j&&j.settings){
-    if(!j.settings.kalk) j.settings.kalk=DEFAULT_DATA.settings.kalk;
-    if(!j.settings.footer) j.settings.footer=DEFAULT_DATA.settings.footer;
-    if(!j.settings.ongkir) j.settings.ongkir=DEFAULT_DATA.settings.ongkir;
-    if(!j.hero) j.hero=DEFAULT_DATA.hero;
-    if(!j.kelebihan) j.kelebihan=DEFAULT_DATA.kelebihan;
-    if(!j.ba) j.ba=[];
-    if(!j.testi) j.testi=[];
-    if(!j.kategori) j.kategori=DEFAULT_DATA.kategori;
-    if(!j.produk||!j.produk.length) j.produk=DEFAULT_DATA.produk;
-    data=j;
-    document.getElementById('statusAdmin').innerText="✅ Terhubung • "+data.produk.length+" produk";
-    document.getElementById('status').innerText="✅ Data terbaru • "+data.produk.length+" produk";
+async function loadData(){
+  try{
+    let r=await fetch(API_URL+'?t='+Date.now());
+    let j=await r.json();
+    if(j&&j.settings){
+      if(!j.settings.kalk) j.settings.kalk=DEFAULT_DATA.settings.kalk;
+      if(!j.settings.footer) j.settings.footer=DEFAULT_DATA.settings.footer;
+      if(!j.settings.ongkir) j.settings.ongkir=DEFAULT_DATA.settings.ongkir;
+      if(!j.hero) j.hero=DEFAULT_DATA.hero;
+      if(!j.kelebihan) j.kelebihan=DEFAULT_DATA.kelebihan;
+      if(!j.ba) j.ba=[];
+      if(!j.testi) j.testi=[];
+      if(!j.kategori) j.kategori=DEFAULT_DATA.kategori;
+      if(!j.produk||!j.produk.length) j.produk=DEFAULT_DATA.produk;
+      data=j;
+      document.getElementById('statusAdmin').innerText="✅ Terhubung • "+data.produk.length+" produk";
+      document.getElementById('status').innerText="✅ Data terbaru • "+data.produk.length+" produk";
+    }
+  }catch(e){
+    document.getElementById('status').innerText="✅ Pakai data default (offline) • "+data.produk.length+" produk";
+    document.getElementById('statusAdmin').innerText="⚠️ Offline - pakai data default";
   }
-}catch(e){
-  document.getElementById('status').innerText="✅ Pakai data default (offline) • "+data.produk.length+" produk";
-  document.getElementById('statusAdmin').innerText="⚠️ Offline - pakai data default";
+  try{
+    let or=await fetch('https://api.npoint.io/4de503fd38d36ee7d2c1?t='+Date.now());
+    let oj=await or.json();
+    let srvOrders=oj.orders||oj.zabbro_orders||[];
+    if(srvOrders.length>0){
+      data.orders=srvOrders;
+      localStorage.setItem('zabbro_orders',JSON.stringify(srvOrders));
+      localStorage.setItem('orders',JSON.stringify(srvOrders));
+    }
+  }catch(e){}
+  cart=getCart();orders=getOrders();renderAll();updateAkunUI();updateCartUI();
 }
-// === TAMBAHAN ANTI-0 & AUTO PULL ORDERS ===
-try{
-  let or=await fetch('https://api.npoint.io/4de503fd38d36ee7d2c1?t='+Date.now());
-  let oj=await or.json();
-  let srvOrders = oj.orders||oj.zabbro_orders||[];
-  if(srvOrders.length>0){
-    data.orders = srvOrders;
-    localStorage.setItem('zabbro_orders', JSON.stringify(srvOrders));
-    localStorage.setItem('orders', JSON.stringify(srvOrders));
-  }
-}catch(e){}
-cart=getCart();orders=getOrders();renderAll();updateAkunUI();updateCartUI();}
-function renderAll(){try{renderKatalog();if(data.users)saveUsers(data.users);renderAdminLists();isiDropdown();updateStats();renderFooter()}catch(e){document.getElementById('status').innerText='⚠️ Error render: '+e.message}}
+function renderAll(){
+  try{renderKatalog();if(data.users)saveUsers(data.users);renderAdminLists();isiDropdown();updateStats();renderFooter();}catch(e){}
+}
 function bukaDetail(i){
 let p=data.produk[i]; if(!p)return;
 document.getElementById('detailFotoUtama').innerHTML='<img src="'+(p.foto||'')+'" style="width:100%;height:280px;object-fit:cover" onerror="this.src=\'https://images.unsplash.com/photo-1522708323259-d24dbb6b0267?w=600&q=80\'">';
