@@ -40,41 +40,42 @@ function checkoutWA(){if(!cart.length){alert('Keranjang kosong!');return}let h=h
 function buatPesanan(show=true){if(!cart.length){alert('Keranjang kosong!');return}let h=hitungCart(),alamat=document.getElementById('cartAlamat').value,u=getCurrentUser(),o={id:'ZAB-'+Date.now().toString().slice(-6),tanggal:new Date().toLocaleString('id-ID'),items:JSON.parse(JSON.stringify(cart)),subtotal:h.subtotal,ongkir:h.ongkir,total:h.total,kecamatan:h.kec,alamat:alamat||(u?u.alamat:''),nama:u?u.nama:'Guest',wa:u?u.wa:'',email:u?u.email:'',status:'Menunggu DP',bukti:'',survey:document.getElementById('cartSurvey')?.value||''};let a=getOrders();a.unshift(o);saveOrders(a);cart=[];saveCart();renderCart();closeCart();if(show)alert('✅ Pesanan dibuat!\nNomor: '+o.id+'\nTotal: '+formatRp(o.total)+'\nUpload bukti DP di Akun Saya -> Pesanan Saya.\nRekening: '+(data.settings.rekening||'-'));if(u)openAuth()}
 function getOrders(){
   try{
-    let srv = (window.data && data.orders && data.orders.length>0) ? data.orders : [];
+    let srv = (window.data && data.orders && data.orders.length) ? data.orders : [];
     let local = []; try{ local = JSON.parse(localStorage.getItem('zabbro_orders')||'[]'); }catch(e){}
+    if(!local.length){ try{ local = JSON.parse(localStorage.getItem('orders')||'[]'); }catch(e){} }
     let merged = [...srv];
-    local.forEach(o=>{ if(!merged.find(x=>x.id===o.id)) merged.push(o); });
-    // kalau server masih kosong, pakai local
-    if(merged.length===0 && local.length>0) merged = local;
+    local.forEach(o=>{ if(o&&o.id&&!merged.find(x=>x.id===o.id)) merged.push(o); });
+    if(merged.length===0 && local.length>0) return local;
     return merged;
   }catch(e){ return []; }
 }
 
 function saveOrders(o){
   try{
-    // 1. simpan lokal dulu
+    if(!o || o.length===0){ console.log('BLOCK save kosong'); return; } // <-- KUNCI ANTI 0
     localStorage.setItem('zabbro_orders', JSON.stringify(o));
     localStorage.setItem('orders', JSON.stringify(o));
     localStorage.setItem('pesanan', JSON.stringify(o));
     window.orders = o;
     if(window.data) data.orders = o;
-
-    // 2. push ke NPoint dengan MERGE (jangan timpa)
     (async()=>{
       const NPOINT='https://api.npoint.io/4de503fd38d36ee7d2c1';
-      let cur={}; try{cur=await (await fetch(NPOINT)).json()}catch(e){cur={};}
-      let srv = cur.orders || cur.zabbro_orders || [];
-      let merged = [...srv];
-      o.forEach(x=>{
-        if(!merged.find(y=>y.id===x.id)) merged.unshift(x);
-      });
-      cur.orders = merged;
-      cur.zabbro_orders = merged;
-      // biar settings dll gak hilang
-      await fetch(NPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cur)});
-      console.log('saveOrders OK total:',merged.length);
+      try{
+        let r = await fetch(NPOINT+'?t='+Date.now());
+        let cur = await r.json();
+        let srv = cur.orders || cur.zabbro_orders || [];
+        if(srv.length===0 && o.length>0){ // server kosong tapi kita punya data, jangan timpa kosong, langsung pakai punya kita
+          srv = [];
+        }
+        let map = {};
+        srv.forEach(x=>{ if(x&&x.id) map[x.id]=x; });
+        o.forEach(x=>{ if(x&&x.id) map[x.id]=x; });
+        let merged = Object.values(map);
+        if(merged.length===0) return; // jangan post kosong
+        await fetch(NPOINT, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({orders: merged})});
+      }catch(e){ console.log('npoint err',e); }
     })();
-  }catch(e){ console.error(e); }
+  }catch(e){}
 }
 function updateOrderStatus(id,st){let a=getOrders(),o=a.find(x=>x.id==id);if(o){o.status=st;saveOrders(a);tampilOrderAdmin();updateStats();alert('✅ Status '+id+' jadi: '+st)}}
 function uploadBukti(id){let inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.onchange=async(e)=>{let f=e.target.files[0];if(!f)return;let fd=new FormData();fd.append('reqtype','fileupload');fd.append('fileToUpload',f);try{let r=await fetch('https://catbox.moe/user/api.php',{method:'POST',body:fd});let link=await r.text();if(!link.includes('http'))throw new Error('Upload gagal');let a=getOrders(),o=a.find(x=>x.id==id);o.bukti=link.trim();o.status='Menunggu Konfirmasi DP';saveOrders(a);alert('✅ Bukti DP berhasil diupload! Admin akan konfirmasi.');updateAuthUI();tampilOrderAdmin()}catch(err){alert('❌ Gagal upload: '+err.message)}};inp.click()}
@@ -145,7 +146,38 @@ function chatMember(wa,n){window.open('https://wa.me/'+wa+'?text=Halo '+encodeUR
 function hapusMember(i){if(!confirm('Hapus member ini?'))return;let u=getUsers();u.splice(i,1);saveUsers(u);tampilMember();updateStats()}
 function hapusSemuaMember(){if(!confirm('Hapus semua member?'))return;localStorage.removeItem('zabbro_users');tampilMember();updateStats()}
 
-async function loadData(){try{let r=await fetch(API_URL),j=await r.json();if(j&&j.settings){if(!j.settings.kalk)j.settings.kalk=DEFAULT_DATA.settings.kalk;if(!j.settings.footer)j.settings.footer=DEFAULT_DATA.settings.footer;if(!j.settings.ongkir)j.settings.ongkir=DEFAULT_DATA.settings.ongkir;if(!j.hero)j.hero=DEFAULT_DATA.hero;if(!j.kelebihan)j.kelebihan=DEFAULT_DATA.kelebihan;if(!j.ba)j.ba=[];if(!j.testi)j.testi=[];if(!j.kategori)j.kategori=DEFAULT_DATA.kategori;if(!j.produk||!j.produk.length)j.produk=DEFAULT_DATA.produk;data=j;document.getElementById('statusAdmin').innerText="✅ Terhubung • "+data.produk.length+" produk";document.getElementById('status').innerText="✅ Data terbaru • "+data.produk.length+" produk"}}catch(e){document.getElementById('status').innerText="✅ Pakai data default (offline) • "+data.produk.length+" produk";document.getElementById('statusAdmin').innerText="⚠️ Offline - pakai data default"}cart=getCart();orders=getOrders();renderAll();updateAkunUI();updateCartUI()}
+async function loadData(){try{
+  let r=await fetch(API_URL), j=await r.json();
+  if(j&&j.settings){
+    if(!j.settings.kalk) j.settings.kalk=DEFAULT_DATA.settings.kalk;
+    if(!j.settings.footer) j.settings.footer=DEFAULT_DATA.settings.footer;
+    if(!j.settings.ongkir) j.settings.ongkir=DEFAULT_DATA.settings.ongkir;
+    if(!j.hero) j.hero=DEFAULT_DATA.hero;
+    if(!j.kelebihan) j.kelebihan=DEFAULT_DATA.kelebihan;
+    if(!j.ba) j.ba=[];
+    if(!j.testi) j.testi=[];
+    if(!j.kategori) j.kategori=DEFAULT_DATA.kategori;
+    if(!j.produk||!j.produk.length) j.produk=DEFAULT_DATA.produk;
+    data=j;
+    document.getElementById('statusAdmin').innerText="✅ Terhubung • "+data.produk.length+" produk";
+    document.getElementById('status').innerText="✅ Data terbaru • "+data.produk.length+" produk";
+  }
+}catch(e){
+  document.getElementById('status').innerText="✅ Pakai data default (offline) • "+data.produk.length+" produk";
+  document.getElementById('statusAdmin').innerText="⚠️ Offline - pakai data default";
+}
+// === TAMBAHAN ANTI-0 & AUTO PULL ORDERS ===
+try{
+  let or=await fetch('https://api.npoint.io/4de503fd38d36ee7d2c1?t='+Date.now());
+  let oj=await or.json();
+  let srvOrders = oj.orders||oj.zabbro_orders||[];
+  if(srvOrders.length>0){
+    data.orders = srvOrders;
+    localStorage.setItem('zabbro_orders', JSON.stringify(srvOrders));
+    localStorage.setItem('orders', JSON.stringify(srvOrders));
+  }
+}catch(e){}
+cart=getCart();orders=getOrders();renderAll();updateAkunUI();updateCartUI();}
 function renderAll(){try{renderKatalog();if(data.users)saveUsers(data.users);renderAdminLists();isiDropdown();updateStats();renderFooter()}catch(e){document.getElementById('status').innerText='⚠️ Error render: '+e.message}}
 function bukaDetail(i){
 let p=data.produk[i]; if(!p)return;
@@ -354,31 +386,56 @@ if(location.search.includes('export')){
   },500);
 }
 </script><script>
-// PATCH FINAL - pastikan checkout selalu masuk server
+// PATCH FINAL V2 - anti 0 + auto pull
 (function(){
   const NPOINT='https://api.npoint.io/4de503fd38d36ee7d2c1';
+  
   async function pushOrder(newOrder){
     try{
-      let cur={}; try{cur=await (await fetch(NPOINT)).json()}catch(e){cur={};}
+      if(!newOrder || !newOrder.id) return;
+      let cur={}; try{cur=await (await fetch(NPOINT+'?t='+Date.now())).json()}catch(e){cur={};}
       let srv = cur.orders || cur.zabbro_orders || [];
-      if(newOrder && newOrder.id){
-        if(!srv.find(x=>x.id===newOrder.id)) srv.push(newOrder);
-      }
+      if(!srv.find(x=>x.id==newOrder.id)) srv.push(newOrder);
+      if(srv.length===0) return;
       cur.orders=srv; cur.zabbro_orders=srv;
-      await fetch(NPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cur)});
+      await fetch(NPOINT, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(cur)});
       localStorage.setItem('orders', JSON.stringify(srv));
       localStorage.setItem('zabbro_orders', JSON.stringify(srv));
       localStorage.setItem('pesanan', JSON.stringify(srv));
-      if(typeof orders!=='undefined') window.orders=srv;
-      console.log('PUSH OK total',srv.length);
+      console.log('PUSH OK',srv.length);
       return srv;
-    }catch(e){ console.error(e); }
+    }catch(e){console.error(e);}
   }
-  // kalau ada fungsi checkout lama, kita bungkus
-  if(window.buatPesanan){ const _old=window.buatPesanan; window.buatPesanan=async function(o){ let r=await _old(o); await pushOrder(o||r); return r; } }
-  if(window.checkout){ const _old=window.checkout; window.checkout=async function(o){ let r=await _old(o); await pushOrder(o||r); return r; } }
-  if(window.kirimPesanan){ const _old=window.kirimPesanan; window.kirimPesanan=async function(o){ let r=await _old(o); await pushOrder(o||r); return r; } }
-  // expose global
-  window.pushOrder = pushOrder;
+
+  async function pullOrder(){
+    try{
+      let r=await fetch(NPOINT+'?t='+Date.now());
+      let cur=await r.json();
+      let srv=cur.orders||cur.zabbro_orders||[];
+      if(srv.length===0) return;
+      let local=[]; try{local=JSON.parse(localStorage.getItem('zabbro_orders')||'[]')}catch(e){}
+      if(srv.length>local.length || srv.length!==local.length){
+        localStorage.setItem('orders', JSON.stringify(srv));
+        localStorage.setItem('zabbro_orders', JSON.stringify(srv));
+        localStorage.setItem('pesanan', JSON.stringify(srv));
+        if(window.data) data.orders=srv;
+        window.orders=srv;
+        if(typeof renderAll==='function') renderAll();
+        console.log('PULL OK',srv.length);
+      }
+    }catch(e){}
+  }
+
+  // bungkus fungsi checkout lama
+  if(window.buatPesanan){ const _o=window.buatPesanan; window.buatPesanan=async function(o){ let r=await _o(o); await pushOrder(o||r); return r; } }
+  if(window.checkout){ const _o=window.checkout; window.checkout=async function(o){ let r=await _o(o); await pushOrder(o||r); return r; } }
+  if(window.kirimPesanan){ const _o=window.kirimPesanan; window.kirimPesanan=async function(o){ let r=await _o(o); await pushOrder(o||r); return r; } }
+  if(window.buatPesananWA){ const _o=window.buatPesananWA; window.buatPesananWA=async function(o){ let r=await _o(o); await pushOrder(o||r); return r; } }
+
+  window.pushOrder=pushOrder;
+  pullOrder();
+  setInterval(pullOrder, 8000);
+  window.addEventListener('focus', pullOrder);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) pullOrder(); });
 })();
 </script></body></html>
