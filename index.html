@@ -178,16 +178,6 @@ data.settings.footer.cert=document.getElementById('fCertEdit').value;
 data.settings.bannerTitle=document.getElementById('sBannerTitle2').value;
 await simpanData(); alert('✅ Tersimpan ke NPOINT!'); tampil(); renderFooter();
 }
-// biar panel ini ke-load pas buka admin
-let _oldGoAdmin = goAdmin;
-goAdmin = function(){ _oldGoAdmin(); setTimeout(tampilKelebihanAdmin,300); }
-function showAdminTab(t){
-  ['produk','order','booking','ongkir','ba','testi','setting','member','kalkulator','kelebihan'].forEach(function(x){
-    var d=document.getElementById('atab-'+x);
-    if(d) d.style.display=(x===t?'block':'none');
-  });
-  if(t==='kelebihan') tampilKelebihanAdmin();
-}
 async function simpanKelebihanFooter(){
   try{
     var list=document.querySelectorAll('#listKelebihanAdmin > div');
