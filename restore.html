@@ -1,0 +1,20 @@
+<!DOCTYPE html><html><body><h2>Restore ZABBRO...</h2><script>
+(async()=>{
+const NPOINT='https://api.npoint.io/4de503fd38d36ee7d2c1';
+const recovered=[
+{"id":"ZAB-577592","tanggal":"3/11/2026 15.12.57","items":[{"kode":"ZAB-PVC-020","nama":"Plafon PVC 1","harga":50000,"qty":1}],"subtotal":50000,"ongkir":75000,"total":125000,"kecamatan":"Surabaya","alamat":"Jauh","nama":"Noname","wa":"6285283201808","status":"Menunggu DP"},
+{"id":"ZAB-979326","tanggal":"3/11/2026 15.02.59","items":[{"kode":"ZAB-PVC-008","nama":"Pvc","harga":97978,"qty":4}],"subtotal":391912,"ongkir":50000,"total":441912,"kecamatan":"Sidoarjo Kota","nama":"Noname","wa":"6285283201808","status":"Menunggu DP"},
+{"id":"ZAB-797946","tanggal":"3/11/2026 14.43.17","items":[{"kode":"ZAB-PVC-008","nama":"Pvc","harga":97978,"qty":1}],"subtotal":97978,"ongkir":50000,"total":147978,"kecamatan":"Sidoarjo Kota","nama":"Noname","wa":"6285283201808","status":"Menunggu DP"},
+{"id":"ZAB-378683","tanggal":"3/11/2026 14.02.58","items":[{"kode":"ZAB-PVC-008","nama":"Pvc","harga":97978,"qty":1}],"subtotal":97978,"ongkir":50000,"total":147978,"kecamatan":"Sidoarjo Kota","nama":"Noname","wa":"6285283201808","status":"Menunggu DP"},
+{"id":"ZAB-709354","tanggal":"2/11/2026 20.05.09","items":[{"kode":"ZAB-PVC-008","nama":"Pvc","harga":97978,"qty":1}],"subtotal":97978,"ongkir":50000,"total":147978,"kecamatan":"Sidoarjo Kota","nama":"Noname","wa":"6285283201808","status":"Menunggu DP"},
+{"id":"ZAB-467843","tanggal":"2/11/2026 20.01.07","items":[{"kode":"ZAB-PVC-008","nama":"Pvc","harga":97978,"qty":1}],"subtotal":97978,"ongkir":50000,"total":147978,"kecamatan":"Sidoarjo Kota","nama":"Noname","wa":"6285283201808","status":"Menunggu DP"},
+{"id":"ZAB-392952","tanggal":"2/11/2026 19.59.52","items":[{"kode":"ZAB-PVC-008","nama":"Pvc","harga":97978,"qty":1}],"subtotal":97978,"ongkir":50000,"total":147978,"kecamatan":"Sidoarjo Kota","nama":"Noname","wa":"6285283201808","status":"Menunggu DP"}
+];
+let cur={}; try{cur=await (await fetch(NPOINT)).json()}catch(e){}
+let merged=[...(cur.orders||cur.zabbro_orders||[])]; 
+recovered.forEach(o=>{if(!merged.find(x=>x.id===o.id)) merged.push(o);});
+cur.orders=merged; cur.zabbro_orders=merged;
+await fetch(NPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cur)});
+document.body.innerHTML='<h1>RESTORE SELESAI total: '+merged.length+'</h1><a href="/">Kembali ke Admin</a>';
+})()
+</script></body></html>
