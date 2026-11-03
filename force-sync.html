@@ -1,0 +1,14 @@
+<!DOCTYPE html><html><body><h2>Sync HP...</h2><script>
+(async()=>{
+const NPOINT='https://api.npoint.io/4de503fd38d36ee7d2c1';
+let cur={}; try{cur=await (await fetch(NPOINT)).json()}catch(e){}
+let orders = cur.orders || cur.zabbro_orders || [];
+localStorage.setItem('orders', JSON.stringify(orders));
+localStorage.setItem('zabbro_orders', JSON.stringify(orders));
+localStorage.setItem('pesanan', JSON.stringify(orders));
+if(cur.zabbro_data) localStorage.setItem('zabbro_data', JSON.stringify(cur));
+else localStorage.setItem('zabbro_data', JSON.stringify({orders}));
+document.body.innerHTML='<h1>SYNC OK: '+orders.length+' pesanan</h1><a href="/#admin">Balik ke Admin</a>';
+setTimeout(()=>location.href='/#admin',1500);
+})()
+</script></body></html>
