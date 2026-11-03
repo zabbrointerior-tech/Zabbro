@@ -131,40 +131,44 @@ function hapusSemuaMember(){if(!confirm('Hapus semua member?'))return;localStora
 
 async function loadData(){
   try{
-    let r=await fetch(API_URL+'?t='+Date.now());
-    let j=await r.json();
-    if(j&&j.settings){
-      if(!j.settings.kalk) j.settings.kalk=DEFAULT_DATA.settings.kalk;
-      if(!j.settings.footer) j.settings.footer=DEFAULT_DATA.settings.footer;
-      if(!j.settings.ongkir) j.settings.ongkir=DEFAULT_DATA.settings.ongkir;
-      if(!j.hero) j.hero=DEFAULT_DATA.hero;
-      if(!j.kelebihan) j.kelebihan=DEFAULT_DATA.kelebihan;
-      if(!j.ba) j.ba=[];
-      if(!j.testi) j.testi=[];
-      if(!j.kategori) j.kategori=DEFAULT_DATA.kategori;
-      if(!j.produk||!j.produk.length) j.produk=DEFAULT_DATA.produk;
-      data=j;
-      document.getElementById('statusAdmin').innerText="✅ Terhubung • "+data.produk.length+" produk";
-      document.getElementById('status').innerText="✅ Data terbaru • "+data.produk.length+" produk";
+    document.body.style.cursor='default';
+    let r = await fetch(API_URL);
+    let j = await r.json();
+    data.produk = j.produk || j.data || j || [];
+    // ambil orders dari NPoint terpisah, kalau gagal pakai lokal
+    try{
+      let ro = await fetch('https://api.npoint.io/4de503fd38d36ee7d2c1');
+      let jo = await ro.json();
+      let serverOrders = jo.orders || jo.zabbro_orders || [];
+      let localOrders = JSON.parse(localStorage.getItem('zabbro_orders')||'[]');
+      // gabung biar gak hilang
+      let map={}; serverOrders.forEach(o=>map[o.id]=o);
+      localOrders.forEach(o=>{ if(!map[o.id]) serverOrders.push(o); });
+      orders = serverOrders;
+      data.orders = orders;
+    }catch(e){
+      orders = JSON.parse(localStorage.getItem('zabbro_orders')||'[]');
+      data.orders = orders;
     }
   }catch(e){
-    document.getElementById('status').innerText="✅ Pakai data default (offline) • "+data.produk.length+" produk";
-    document.getElementById('statusAdmin').innerText="⚠️ Offline - pakai data default";
+    console.log('load gagal pakai lokal', e);
+    let localData = JSON.parse(localStorage.getItem('zabbro_data')||'null');
+    if(localData && localData.produk) data.produk = localData.produk;
+    orders = JSON.parse(localStorage.getItem('zabbro_orders')||'[]');
+    data.orders = orders;
   }
-  try{
-    let or=await fetch('https://api.npoint.io/4de503fd38d36ee7d2c1?t='+Date.now());
-    let oj=await or.json();
-    let srvOrders=oj.orders||oj.zabbro_orders||[];
-    if(srvOrders.length>0){
-      data.orders=srvOrders;
-      localStorage.setItem('zabbro_orders',JSON.stringify(srvOrders));
-      localStorage.setItem('orders',JSON.stringify(srvOrders));
-    }
-  }catch(e){}
-  cart=getCart();orders=getOrders();renderAll();updateAkunUI();updateCartUI();
-}
+  try{ renderAll(); }catch(e){ try{ renderKatalog(); }catch(e2){} }
+  let st=document.getElementById('status')||document.getElementById('statusAdmin');
+  if(st) st.innerText='';
+  }
+
 function renderAll(){
-  try{renderKatalog();if(data.users)saveUsers(data.users);renderAdminLists();isiDropdown();updateStats();renderFooter();}catch(e){}
+  try{ if(typeof renderKatalog==='function') renderKatalog(); }catch(e){}
+  try{ if(typeof renderAdminLists==='function') renderAdminLists(); }catch(e){}
+  try{ if(typeof isiDropdown==='function') isiDropdown(); }catch(e){}
+  try{ if(typeof updateStats==='function') updateStats(); }catch(e){}
+  try{ if(typeof renderFooter==='function') renderFooter(); }catch(e){}
+  try{ if(typeof renderPesananCustomer==='function') renderPesananCustomer(); }catch(e){}
 }
 function bukaDetail(i){
 let p=data.produk[i]; if(!p)return;
@@ -450,130 +454,32 @@ if(location.search.includes('export')){
 </script>
   
   <script>
-  
-  // ===== ZABBRO PATCH V3 - BUKTI + BATAL/HAPUS + RIWAYAT =====
+      
 function kirimBukti(id){
-  let inp = document.createElement('input');
-  inp.type='file'; inp.accept='image/*';
-  inp.onchange = async (e)=>{
-    let file = e.target.files[0]; if(!file) return;
-    try{
-      // KOMPRES OTOMATIS biar muat di server
-      let base64 = await new Promise((res,rej)=>{
-        let img = new Image();
-        img.onload = ()=>{
-          let canvas = document.createElement('canvas');
-          let maxW = 800;
-          let scale = Math.min(1, maxW / img.width);
-          canvas.width = img.width*scale;
-          canvas.height = img.height*scale;
-          canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
-          res(canvas.toDataURL('image/jpeg',0.6)); // 0.6 = kecil 50-100KB
-        };
-        img.onerror=rej;
-        let r=new FileReader(); r.onload=()=>{ img.src=r.result; }; r.readAsDataURL(file);
-      });
-
-      let idx = orders.findIndex(o=>o.id==id);
-      if(idx<0) idx = data.orders.findIndex(o=>o.id==id);
-      if(idx>=0){
-        orders[idx].bukti = base64;
-        orders[idx].tglBukti = new Date().toISOString();
-        orders[idx].status = 'bukti_terkirim';
-        if(!orders[idx].riwayat) orders[idx].riwayat=[];
-        orders[idx].riwayat.push({tgl:new Date().toLocaleString('id-ID'), aksi:'Bukti transfer dikirim (kompres)'});
-        
-        data.orders = orders;
-        // SIMPAN LOKAL DULU - LANGSUNG SUKSES
-        localStorage.setItem('zabbro_orders', JSON.stringify(orders));
-        localStorage.setItem('orders', JSON.stringify(orders));
-        
-        alert('✅ Bukti berhasil terkirim! (versi kompres biar masuk ke admin)');
-        renderAll();
-        
-        // coba sync ke server di background, kalau gagal pun data lokal sudah aman
-        try{ saveOrders(orders); }catch(err){ console.log('sync background gagal, tapi lokal aman'); }
-      }
-    }catch(err){ alert('Gagal proses foto: '+err.message); }
-  };
-  inp.click();
+  let inp=document.createElement('input'); inp.type='file'; inp.accept='image/*';
+  inp.onchange=async(e)=>{
+    let file=e.target.files[0]; if(!file) return;
+    let base64=await new Promise((res,rej)=>{
+      let img=new Image();
+      img.onload=()=>{
+        let c=document.createElement('canvas'), maxW=800, s=Math.min(1,maxW/img.width);
+        c.width=img.width*s; c.height=img.height*s;
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        res(c.toDataURL('image/jpeg',0.6));
+      }; img.onerror=rej;
+      let r=new FileReader(); r.onload=()=>img.src=r.result; r.readAsDataURL(file);
+    });
+    let o=orders.find(x=>x.id==id)||data.orders.find(x=>x.id==id);
+    if(o){ o.bukti=base64; o.tglBukti=new Date().toISOString(); o.status='bukti_terkirim'; if(!o.riwayat)o.riwayat=[]; o.riwayat.push({tgl:new Date().toLocaleString('id-ID'),aksi:'Bukti dikirim'}); localStorage.setItem('zabbro_orders',JSON.stringify(orders)); saveOrders(orders); alert('✅ Bukti berhasil terkirim!'); renderAll(); }
+  }; inp.click();
 }
+function batalkanPesanan(id){ if(!confirm('Batalkan?'))return; let o=orders.find(x=>x.id==id); if(o){ o.status='dibatalkan'; saveOrders(orders); renderAll(); } }
+function hapusPesanan(id){ if(!confirm('Hapus?'))return; orders=orders.filter(x=>x.id!=id); data.orders=orders; localStorage.setItem('zabbro_orders',JSON.stringify(orders)); saveOrders(orders); renderAll(); }
 
- 
-function batalkanPesanan(id){
-  if(!confirm('Yakin mau batalkan pesanan ini?')) return;
-  let o = orders.find(x=>x.id==id) || data.orders.find(x=>x.id==id);
-  if(!o) return;
-  if(o.status=='selesai' || o.status=='dikirim'){ alert('Pesanan sudah diproses, hubungi admin WA'); return; }
-  o.status='dibatalkan';
-  if(!o.riwayat) o.riwayat=[];
-  o.riwayat.push({tgl:new Date().toLocaleString('id-ID'), aksi:'Dibatalkan customer'});
-  data.orders=orders;
-  saveOrders(orders);
-  alert('Pesanan dibatalkan');
-  renderAll();
-}
-
-function hapusPesanan(id){
-  if(!confirm('Hapus permanen pesanan ini dari riwayat?')) return;
-  orders = orders.filter(x=>x.id!=id);
-  data.orders = orders;
-  saveOrders(orders);
-  // paksa save walau habis hapus sisa masih ada, kalau 0 kita tetap simpen lokal aja
-  localStorage.setItem('zabbro_orders', JSON.stringify(orders));
-  alert('Pesanan dihapus');
-  renderAll();
-}
-
-// OVERRIDE render pesanan customer biar ada tombol bukti/batal/hapus + riwayat
-const _oldRenderCart = typeof renderCart==='function' ? renderCart : null;
-function renderPesananCustomer(){
-  let cont = document.getElementById('listPesanan') || document.getElementById('riwayatPesanan') || document.getElementById('akunPesanan');
-  if(!cont) return;
-  if(!orders.length){ cont.innerHTML='<p style="text-align:center;padding:20px">Belum ada pesanan</p>'; return; }
-  cont.innerHTML = orders.slice().reverse().map(o=>{
-    let buktiHtml = o.bukti ? `<div style="margin:8px 0"><b>Riwayat Bukti:</b><br><img src="${o.bukti}" style="max-width:100%;max-height:150px;border-radius:8px;border:1px solid #ddd"><br><small>${o.tglBukti?new Date(o.tglBukti).toLocaleString('id-ID'):''}</small></div>` : '<small style="color:#888">Belum ada bukti</small>';
-    let riwayatHtml = (o.riwayat||[]).map(r=>`<li>${r.tgl} - ${r.aksi}</li>`).join('');
-    return `<div style="border:1px solid #ddd;border-radius:12px;padding:12px;margin-bottom:12px;background:#fff">
-      <b>ID: ${o.id}</b> <span style="float:right;background:#eee;padding:2px 8px;border-radius:10px;font-size:12px">${o.status||'menunggu'}</span>
-      <div style="font-size:13px;margin:6px 0">Total: Rp${(o.total||0).toLocaleString('id-ID')} • ${o.items?o.items.length:0} item</div>
-      ${buktiHtml}
-      ${riwayatHtml?`<ul style="font-size:11px;margin:6px 0 0 16px">${riwayatHtml}</ul>`:''}
-      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
-        ${!o.bukti||o.status=='menunggu'?`<button onclick="kirimBukti('${o.id}')" style="flex:1;padding:8px;background:#000;color:#fff;border-radius:8px">📤 Kirim Bukti</button>`: `<button onclick="kirimBukti('${o.id}')" style="flex:1;padding:8px;background:#444;color:#fff;border-radius:8px">🔄 Ganti Bukti</button>`}
-        ${o.status!='dibatalkan'&&o.status!='selesai'?`<button onclick="batalkanPesanan('${o.id}')" style="padding:8px;background:#ffefe0;border-radius:8px">Batalkan</button>`:''}
-        <button onclick="hapusPesanan('${o.id}')" style="padding:8px;background:#ffe0e0;border-radius:8px">🗑️ Hapus</button>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-// Hook ke renderAll biar customer selalu update
-const _oldRenderAll = renderAll;
-renderAll = function(){
-  try{ _oldRenderAll(); }catch(e){ try{ renderKatalog(); }catch(e2){} }
-  try{ renderPesananCustomer(); }catch(e){}
-  try{ renderAdminLists(); }catch(e){}
-}
-
-// ADMIN: tampilkan bukti di list admin
-function renderAdminListsPatch(){
-  let cont = document.getElementById('adminOrders') || document.getElementById('listOrderAdmin');
-  if(!cont) return;
-  let all = (data.orders||[]).slice().reverse();
-  cont.innerHTML = all.map(o=>`
-    <div style="border:1px solid #ddd;padding:10px;border-radius:10px;margin-bottom:10px">
-      <b>${o.id}</b> - ${o.status||'baru'} - Rp${(o.total||0).toLocaleString()}
-      <div style="font-size:12px">${o.nama||''} ${o.wa||''} ${o.alamat||''}</div>
-      ${o.bukti?`<a href="${o.bukti}" target="_blank"><img src="${o.bukti}" style="max-width:200px;max-height:150px;margin-top:6px;border:1px solid #ccc"></a><div><small>Bukti: ${o.tglBukti||''}</small> <button onclick="if(confirm('Konfirmasi pembayaran?')){let x=data.orders.find(a=>a.id=='${o.id}');x.status='dikonfirmasi';if(!x.riwayat)x.riwayat=[];x.riwayat.push({tgl:new Date().toLocaleString('id-ID'),aksi:'Dikonfirmasi admin'});saveOrders(data.orders);renderAll();}">✅ Konfirmasi</button></div>`:'<div style="color:red;font-size:12px">Belum ada bukti</div>'}
-      ${(o.riwayat||[]).length?`<div style="font-size:11px;margin-top:6px"><b>Riwayat:</b><ul>${o.riwayat.map(r=>`<li>${r.tgl}-${r.aksi}</li>`).join('')}</ul></div>`:''}
-    </div>
-  `).join('');
-}
-// ganti renderAdminLists lama
-if(typeof renderAdminLists==='function'){
-  let origAdmin = renderAdminLists;
-  renderAdminLists = function(){ try{ origAdmin(); }catch(e){} renderAdminListsPatch(); }
+function saveOrders(o){
+  if(!o||o.length===0) return;
+  localStorage.setItem('zabbro_orders',JSON.stringify(o));
+  (async()=>{ try{ await fetch('https://api.npoint.io/4de503fd38d36ee7d2c1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orders:o,zabbro_orders:o})}); }catch(e){} })();
 }
       </script>
 </body></html>
