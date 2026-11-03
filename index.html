@@ -52,7 +52,11 @@ function getOrders(){
 
 function saveOrders(o){
   try{
-    if(!o || o.length===0){ console.log('BLOCK save kosong'); return; } // <-- KUNCI ANTI 0
+    // ANTI-0: JANGAN PERNAH SIMPAN KOSONG KE SERVER
+    if(!o || o.length===0){
+      console.log('BLOCK save kosong - pesanan tetap aman');
+      return; 
+    }
     localStorage.setItem('zabbro_orders', JSON.stringify(o));
     localStorage.setItem('orders', JSON.stringify(o));
     localStorage.setItem('pesanan', JSON.stringify(o));
@@ -61,22 +65,17 @@ function saveOrders(o){
     (async()=>{
       const NPOINT='https://api.npoint.io/4de503fd38d36ee7d2c1';
       try{
-        let r = await fetch(NPOINT+'?t='+Date.now());
-        let cur = await r.json();
-        let srv = cur.orders || cur.zabbro_orders || [];
-        if(srv.length===0 && o.length>0){ // server kosong tapi kita punya data, jangan timpa kosong, langsung pakai punya kita
-          srv = [];
+        let cur={}; try{ cur=await (await fetch(NPOINT)).json(); }catch(e){}
+        let srv=cur.orders||cur.zabbro_orders||[];
+        // cuma boleh tambah, gak boleh timpa 0
+        if(srv.length > o.length){
+           let map={}; o.forEach(x=>map[x.id]=x); srv.forEach(x=>{if(!map[x.id]) o.push(x)});
         }
-        let map = {};
-        srv.forEach(x=>{ if(x&&x.id) map[x.id]=x; });
-        o.forEach(x=>{ if(x&&x.id) map[x.id]=x; });
-        let merged = Object.values(map);
-        if(merged.length===0) return; // jangan post kosong
-        await fetch(NPOINT, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({orders: merged})});
-      }catch(e){ console.log('npoint err',e); }
+        await fetch(NPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orders:o,zabbro_orders:o})});
+      }catch(e){}
     })();
   }catch(e){}
-}
+  }
 function updateOrderStatus(id,st){let a=getOrders(),o=a.find(x=>x.id==id);if(o){o.status=st;saveOrders(a);tampilOrderAdmin();updateStats();alert('✅ Status '+id+' jadi: '+st)}}
 function uploadBukti(id){let inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.onchange=async(e)=>{let f=e.target.files[0];if(!f)return;let fd=new FormData();fd.append('reqtype','fileupload');fd.append('fileToUpload',f);try{let r=await fetch('https://catbox.moe/user/api.php',{method:'POST',body:fd});let link=await r.text();if(!link.includes('http'))throw new Error('Upload gagal');let a=getOrders(),o=a.find(x=>x.id==id);o.bukti=link.trim();o.status='Menunggu Konfirmasi DP';saveOrders(a);alert('✅ Bukti DP berhasil diupload! Admin akan konfirmasi.');updateAuthUI();tampilOrderAdmin()}catch(err){alert('❌ Gagal upload: '+err.message)}};inp.click()}
 function tampilOrderAdmin(){try{var a=getOrders();var el=document.getElementById('listOrder');if(!el)return;function fr(n){try{return'Rp '+new Intl.NumberFormat('id-ID').format(n||0)}catch{return'Rp '+(n||0)}}el.innerHTML=a.length?a.map(function(o){var its=(o.items&&Array.isArray(o.items))?o.items:[];var buktiHtml='';if(o.bukti){buktiHtml='<div style="margin:8px 0"><a href="'+o.bukti+'" target="_blank"><img src="'+o.bukti+'" style="max-width:140px;max-height:140px;border-radius:10px;border:1px solid #ddd;display:block;margin-bottom:4px" onerror="this.style.display=\'none\'"></a><a href="'+o.bukti+'" target="_blank" style="color:#2563eb;font-size:13px">📎 Lihat Bukti Full</a></div>';}else{buktiHtml='<div style="margin:6px 0;color:#ef4444;font-size:13px">Belum ada bukti DP</div>';}return'<div class="acard" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:center"><b>'+(o.id||'')+'</b><span style="background:#fef3c7;padding:3px 10px;border-radius:12px;font-size:12px">'+(o.status||'Menunggu DP')+'</span></div><div style="font-size:13px;color:#666;margin:4px 0">'+(o.tanggal||'')+' • '+(o.nama||'Guest')+' • WA: '+(o.wa||'-')+'<br>'+(o.kecamatan||'')+' • '+(o.alamat||'')+'</div><div style="font-size:13px;margin:4px 0"><b>Items:</b> '+its.map(function(i){return(i.nama||'')+' x'+(i.qty||'');}).join(', ')+'</div><div style="margin:4px 0"><b>Total:</b> '+fr(o.total)+' <span style="color:#666">(Ongkir '+fr(o.ongkir)+')</span></div>'+buktiHtml+'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"><button class="btn-hijau" onclick="updateOrderStatus(\''+o.id+'\',\'lunas\')">✅ DP Masuk</button><button style="background:#dbeafe;padding:7px 12px;border-radius:8px;border:none" onclick="updateOrderStatus(\''+o.id+'\',\'diproses\')">🔨 Diproses</button><button style="background:#fef3c7;padding:7px 12px;border-radius:8px;border:none" onclick="updateOrderStatus(\''+o.id+'\',\'dikirim\')">🚚 Dikirim</button><button class="btn-hijau" onclick="updateOrderStatus(\''+o.id+'\',\'selesai\')">✅ Selesai</button><button class="btn-merah" onclick="hapusOrder(\''+o.id+'\')">🗑️ Hapus</button></div></div>';}).join(''):'<p>Belum ada pesanan</p>';}catch(e){var el2=document.getElementById('listOrder');if(el2)el2.innerHTML='<p style="color:red">Error: '+e.message+'</p>';console.error(e);}}function hapusOrder(id){if(!confirm('Hapus pesanan '+id+'? Gak bisa dibalikin lho.'))return;try{var orders=getOrders();orders=orders.filter(function(o){return o.id!==id});if(typeof data!=='undefined'){if(data.orders)data.orders=orders;if(data.pesanan)data.pesanan=orders;if(data.order)data.order=orders;}try{localStorage.setItem('orders',JSON.stringify(orders));}catch(e){}try{localStorage.setItem('zabbro_orders',JSON.stringify(orders));}catch(e){}try{localStorage.setItem('pesanan',JSON.stringify(orders));}catch(e){}try{localStorage.setItem('zabbro_data',JSON.stringify(data||{orders:orders}));}catch(e){}if(typeof simpanData==='function'){try{simpanData();}catch(e){}}if(typeof saveAll==='function'){try{saveAll();}catch(e){}}if(typeof simpanKeNPoint==='function'){try{simpanKeNPoint();}catch(e){}}if(typeof saveToNPoint==='function'){try{saveToNPoint();}catch(e){}}if(typeof syncToNPoint==='function'){try{syncToNPoint();}catch(e){}}tampilOrderAdmin();if(typeof renderAll==='function'){try{renderAll();}catch(e){}}setTimeout(function(){tampilOrderAdmin();},600);}catch(e){alert('Gagal hapus: '+e.message);console.error(e);}}
@@ -215,6 +214,28 @@ function pilihKat(c){katAktif=c;tampil()}function pesan(i){let p=data.produk[i],
 function isiDropdown(){document.getElementById('fKat').innerHTML=data.kategori.map(k=>'<option>'+k+'</option>').join('')}
 async function uploadFoto(e,urlId,prevId,statusId,btnId){let file=e.target.files[0];if(!file)return;isUploading=true;let btn=document.getElementById(btnId);if(btn){btn.innerText='⏳ UPLOAD...';btn.disabled=true}document.getElementById(statusId).innerText='⏳ Compress & upload...';let fetchTimeout=(u,o,ms)=>Promise.race([fetch(u,o),new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout 12 detik')),ms))]);try{let comp=await new Promise((res)=>{let img=new Image(),url=URL.createObjectURL(file);img.onload=()=>{let c=document.createElement('canvas'),max=1000,w=img.width,h=img.height;if(w>max){h=h*max/w;w=max}c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);c.toBlob((b)=>res(b),'image/jpeg',0.8)};img.src=url});let link='';try{let fd=new FormData();fd.append('reqtype','fileupload');fd.append('fileToUpload',comp,'zabbro.jpg');let r=await fetchTimeout('https://catbox.moe/user/api.php',{method:'POST',body:fd},12000);let t=await r.text();if(!t.includes('http'))throw new Error('catbox gagal');link=t.trim()}catch(e1){document.getElementById(statusId).innerText='⏳ Catbox lemot, coba server ke-2...';try{let fd2=new FormData();fd2.append('file',comp,'zabbro.jpg');let r2=await fetchTimeout('https://0x0.st',{method:'POST',body:fd2},12000);let t2=await r2.text();if(!t2.includes('http'))throw new Error('0x0 gagal');link=t2.trim()}catch(e2){link=await new Promise((res)=>{let fr=new FileReader();fr.onload=()=>res(fr.result);fr.readAsDataURL(comp)});document.getElementById(urlId).value=link;let pr=document.getElementById(prevId);pr.src=link;pr.style.display='block';document.getElementById(statusId).innerText='✅ Berhasil (tersimpan di HP ini)';isUploading=false;if(btn){btn.disabled=false;btn.innerText='📤 UPLOAD'}return}}document.getElementById(urlId).value=link;let pr=document.getElementById(prevId);pr.src=link;pr.style.display='block';document.getElementById(statusId).innerText='✅ Berhasil!'}catch(err){document.getElementById(statusId).innerText='❌ '+err.message}isUploading=false;if(btn){btn.disabled=false;btn.innerText='📤 UPLOAD'}}
 function resetFormProduk(){document.getElementById('editIdx').value='-1';document.getElementById('fKode').value='';document.getElementById('fNama').value='';document.getElementById('fHarga').value='';document.getElementById('fHargaMember').value='';document.getElementById('fStok').value=50;document.getElementById('fStatusStok').value='tersedia';document.getElementById('fPreorder').value='';document.getElementById('fDesk').value='';document.getElementById('fFotoUrl').value='';document.getElementById('fPanjang').value=300;document.getElementById('fLebar').value=20;document.getElementById('fTebal').value=8;document.getElementById('fIsiBox').value=10;document.getElementById('previewProduk').style.display='none';document.getElementById('btnSimpan').innerText='SIMPAN PRODUK'}
+  async function saveAll(){
+  try{
+    let s=document.getElementById('statusAdmin');
+    if(s) s.innerText='⏳ Menyimpan produk...';
+    // simpan produk saja, jangan bawa orders biar gak bentrok
+    let payload = JSON.parse(JSON.stringify(data));
+    delete payload.orders;
+    delete payload.zabbro_orders;
+    let r=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if(!r.ok) throw new Error('API gagal');
+    if(s) s.innerText='✅ '+data.produk.length+' produk tersimpan';
+    renderAll(); updateAkunUI(); updateCartUI();
+    return true;
+  }catch(e){
+    let s=document.getElementById('statusAdmin');
+    if(s) s.innerText='⚠️ Offline - simpan lokal';
+    localStorage.setItem('zabbro_data',JSON.stringify(data));
+    renderAll();
+    return false;
+  }
+}
+async function saveData(){ return saveAll(); }
 async function simpanProduk(){if(isUploading){alert('Tunggu upload selesai!');return}let kode=document.getElementById('fKode').value.trim().toUpperCase()||('ZAB-'+String(data.produk.length+1).padStart(3,'0')),nama=document.getElementById('fNama').value,kat=document.getElementById('fKat').value,harga=parseInt(document.getElementById('fHarga').value)||0,hargaMember=parseInt(document.getElementById('fHargaMember').value)||0,stok=parseInt(document.getElementById('fStok').value);if(isNaN(stok))stok=50;let statusStok=document.getElementById('fStatusStok').value,preorder=document.getElementById('fPreorder').value,satuan=document.getElementById('fSatuan').value,panjang=parseFloat(document.getElementById('fPanjang').value)||0,lebar=parseFloat(document.getElementById('fLebar').value)||0,tebal=parseFloat(document.getElementById('fTebal').value)||0,isiBox=parseInt(document.getElementById('fIsiBox').value)||10,desk=document.getElementById('fDesk').value,foto=document.getElementById('fFotoUrl').value||'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600&q=80';if(!nama||!harga){alert('Isi nama & harga normal!');return}let idx=parseInt(document.getElementById('editIdx').value),obj={kode,nama,kat,harga,hargaMember,stok,statusStok,preorder,satuan,panjang,lebar,tebal,isiBox,desk,foto};if(idx>=0)data.produk[idx]=obj;else{if(data.produk.find(p=>p.kode==kode)){alert('Kode '+kode+' sudah dipakai!');return}data.produk.unshift(obj)}await saveAll();alert('✅ Berhasil! Kode '+kode+' tersimpan.');resetFormProduk()}
 function editProduk(i){let p=data.produk[i];document.getElementById('editIdx').value=i;document.getElementById('fKode').value=p.kode||'';document.getElementById('fNama').value=p.nama;document.getElementById('fKat').value=p.kat;document.getElementById('fHarga').value=p.harga;document.getElementById('fHargaMember').value=p.hargaMember||'';document.getElementById('fStok').value=p.stok??50;document.getElementById('fStatusStok').value=p.statusStok||'tersedia';document.getElementById('fPreorder').value=p.preorder||'';document.getElementById('fSatuan').value=p.satuan;document.getElementById('fPanjang').value=p.panjang||'';document.getElementById('fLebar').value=p.lebar||'';document.getElementById('fTebal').value=p.tebal||'';document.getElementById('fIsiBox').value=p.isiBox||10;document.getElementById('fDesk').value=p.desk;document.getElementById('fFotoUrl').value=p.foto;let pr=document.getElementById('previewProduk');pr.src=p.foto;pr.style.display='block';document.getElementById('btnSimpan').innerText='💾 UPDATE PRODUK';window.scrollTo(0,0);showAdminTab('produk')}
 async function hapusProduk(i){if(!confirm('Hapus '+data.produk[i].nama+'?'))return;data.produk.splice(i,1);await saveAll()}
