@@ -1,0 +1,10 @@
+<script>
+(async()=>{
+const N='https://api.npoint.io/4de503fd38d36ee7d2c1';
+let c=await (await fetch(N+'?t='+Date.now())).json();
+let o=c.orders||c.zabbro_orders||[];
+localStorage.setItem('zabbro_orders',JSON.stringify(o));
+localStorage.setItem('orders',JSON.stringify(o));
+location.href='/#admin';
+})()
+</script>
