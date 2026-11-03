@@ -1,0 +1,25 @@
+<!doctype html>
+<html><body><h3>Restore Zabbro...</h3>
+<script>
+(async()=>{
+const NPOINT='https://api.npoint.io/4de503fd38d36ee7d2c1';
+let local=[];
+try{ local=JSON.parse(localStorage.getItem('zabbro_orders')||'[]'); }catch(e){}
+if(!local.length){ try{ local=JSON.parse(localStorage.getItem('orders')||'[]'); }catch(e){} }
+if(!local.length){ try{ local=JSON.parse(localStorage.getItem('pesanan')||'[]'); }catch(e){} }
+if(!local.length){ alert('HP ini kosong! Buka restore ini di HP yang MASIH ada pesanannya (yang 10 itu)'); return; }
+
+let cur={}; try{ cur=await (await fetch(NPOINT)).json(); }catch(e){}
+let srv=cur.orders||cur.zabbro_orders||[];
+let map={};
+srv.forEach(o=>{ if(o&&o.id) map[o.id]=o; });
+local.forEach(o=>{ if(o&&o.id) map[o.id]=o; });
+let merged=Object.values(map);
+
+if(!confirm('Restore '+merged.length+' pesanan (lokal '+local.length+' + server '+srv.length+') ke server?')) return;
+
+await fetch(NPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orders:merged,zabbro_orders:merged})});
+alert('OK RESTORE '+merged.length+' - server balik!');
+location.href='/#admin';
+})();
+</script></body></html>
